@@ -1,9 +1,9 @@
 # NKN Shell Daemon
 
 NKN shell daemon (nshd) is a Node.js application that uses
-[nkn-client-js](https://github.com/nknorg/nkn-client-js) to listen for incoming
-shell command from authenticated users, executes, and send back results through
-nkn-client. It is similar to sshd but has a few fundamental difference:
+[nkn-multiclient-js](https://github.com/nknorg/nkn-multiclient-js) to listen for
+incoming shell command from authenticated users, executes, and send back results
+through nkn-client. It is similar to sshd but has a few fundamental difference:
 
 1. Network transparent: NKN address is used instead of IP address, so host
 machine can freely change IP address without being affected.
@@ -56,8 +56,10 @@ user/group where nshd process belongs to will be used.
 
 ## Sending Commands and Receiving Results
 
-Sending commands is as simple as using NKN client to send a JSON message to
-nshd's listening NKN address. The JSON message can have the following fields:
+Sending commands is as simple as using
+[nkn-multiclient-js](https://github.com/nknorg/nkn-multiclient-js) or other
+client implementations to send a JSON message to nshd's listening NKN address.
+The JSON message can have the following fields:
 
 * `cmd` <string> Shell command to execute.
 
