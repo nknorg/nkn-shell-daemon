@@ -1,0 +1,30 @@
+{
+  "name": "nkn-shell-daemon",
+  "version": "0.0.1",
+  "description": "NKN Shell Daemon",
+  "main": "nshd.js",
+  "bin": "nshd.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nknorg/nkn-shell-daemon.git"
+  },
+  "keywords": [
+    "NKN",
+    "blockchain",
+    "distributed system"
+  ],
+  "author": "NKN",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/nknorg/nkn-shell-daemon/issues"
+  },
+  "homepage": "https://nkn.org",
+  "dependencies": {
+    "nkn-multiclient": "^0.0.8",
+    "nkn-wallet": "^0.4.6",
+    "yargs": "^14.0.0"
+  }
+}
