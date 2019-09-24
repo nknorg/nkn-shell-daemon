@@ -176,7 +176,7 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
       let res;
       if (msg.content) {
         res = {
-          content: stdout || stderr,
+          content: "```\n" + (stdout || stderr) + "\n```",
           contentType: "text",
           timestamp: new Date().toUTCString(),
           isPrivate: true,
