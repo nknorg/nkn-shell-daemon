@@ -119,18 +119,37 @@ client.on('connect', () => {
     let c = client.clients[i];
     setInterval(function () {
       try {
-        c.ws && c.ws.ping();
+        c.ws && c.ws.ping && c.ws.ping();
       } catch (e) {
-        console.warn("Ping error:", e);
+        console.warn('Websocket ping error:', e);
       }
     }, pingInterval);
   }
+  let lastUpdateTime = new Date();
+  setInterval(async function () {
+    try {
+      await client.send(client.addr, '', { msgHoldingSeconds: 0 });
+      lastUpdateTime = new Date();
+    } catch (e) {
+      console.warn('Multiclient ping error:', e);
+      if (new Date().getTime() - lastUpdateTime.getTime() > pingInterval * 3) {
+        console.log('Multiclient keepalive timeout, trying to reconnect...');
+        for (var i = 0; i < client.clients.length; i++) {
+          client.clients[i].reconnect();
+        }
+      }
+    }
+  }, pingInterval)
 });
 
 client.on('message', async (src, payload, payloadType, encrypt) => {
   if (!encrypt) {
     console.log('Received unencrypted msg from', src);
     return false;
+  }
+
+  if (src === client.addr) {
+    return;
   }
 
   let au = getAuthorizedUser(src);
