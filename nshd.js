@@ -18,6 +18,7 @@ const identifier = argv.identifier || "";
 const syncExecTimeout = argv.syncexectimeout || 5000;
 const asyncExecTimeout = argv.asyncexectimeout || 0;
 const logCmd = argv.logcmd;
+const showAddr = argv._[0] === 'addr';
 
 if (!fs.existsSync(baseDir)){
   fs.mkdirSync(baseDir);
@@ -52,6 +53,11 @@ try {
   wallet = nknWallet.newWallet(password);
   fs.writeFileSync(walletFile, wallet.toJSON());
   console.log("Create wallet and save to file", walletFile);
+}
+
+if (showAddr) {
+  console.log((identifier ? identifier + '.' : '') + wallet.getPublicKey());
+  process.exit(0)
 }
 
 var authorizedPk = [];
