@@ -8,74 +8,83 @@ import { randomBytes } from 'crypto'
 import { exec, execSync } from 'child_process'
 
 let argv = yargs
+  .command('$0', 'start nshd')
   .command('addr', 'show addr')
   .option('base-dir', {
     alias: 'b',
     describe: 'set base directory',
     type: 'string',
+    default: '/etc/nshd/',
   })
   .option('wallet', {
     alias: 'w',
-    describe: 'set wallet file path',
+    describe: 'set wallet file path, default to `baseDir`/wallet.json',
     type: 'string',
   })
   .option('password-file', {
     alias: 'p',
-    describe: 'set wallet password file',
+    describe: 'set wallet password file, default to `baseDir`/wallet.pswd',
     type: 'string',
   })
-  .option('authorized-file', {
+  .option('authorized-pk-file', {
     alias: 'auth',
-    describe: 'set authorized file',
+    describe: 'set authorized file, default to `baseDir`/authorized_pubkeys',
+    type: 'string',
+  })
+  .option('shell', {
+    alias: 's',
+    describe: 'set shell application path, default to bash or powershell.exe (on windows)',
     type: 'string',
   })
   .option('session', {
     alias: 'sess',
     describe: 'nshd will save prev cmd',
     type: 'boolean',
-  })
-  .option('shell', {
-    alias: 's',
-    describe: 'set shell application path',
-    type: 'string',
+    default: false,
   })
   .option('identifier', {
     alias: 'id',
     describe: 'set identifier',
     type: 'string',
+    default: '',
   })
   .option('sync-exec-timeout', {
     alias: ['sto'],
-    describe: 'set sync exec timeout',
+    describe: 'set sync exec timeout in ms',
     type: 'number',
-    default: 5000
+    default: 5000,
   })
   .option('async-exec-timeout', {
     alias: ['ato'],
-    describe: 'set async exec timeout',
+    describe: 'set async exec timeout in ms',
     type: 'number',
-    default: 0
+    default: 0,
+  })
+  .option('log-cmd', {
+    alias: 'lc',
+    describe: 'show executed cmd in console',
+    type: 'boolean',
+    default: false,
   })
   .help('help')
   .alias('h', 'help')
   .wrap(Math.min(120, yargs.terminalWidth()))
   .argv
 
-
 const isWindows = os.platform() === 'win32'
 const pingInterval = 20000
 const showAddr = argv._[0] === 'addr'
-const logCmd = argv.logcmd
 
-const baseDir = argv.baseDir || '/etc/nshd/'
+const baseDir = argv.baseDir + (argv.baseDir.endsWith('/') ? '' : '/')
 const walletFile = argv.wallet || baseDir + 'wallet.json'
 const passwordFile = argv.passwordFile || baseDir + 'wallet.pswd'
-const authorizedPkFile = argv.authorizedFile || baseDir + 'authorized_pubkeys'
+const authorizedPkFile = argv.authorizedPkFile || baseDir + 'authorized_pubkeys'
 const shell = argv.shell || (isWindows ? 'powershell.exe' : 'bash')
-const session = argv.session || false
-const identifier = argv.identifier || ''
-const syncExecTimeout = argv.syncExecTimeout || 5000
-const asyncExecTimeout = argv.asyncExecTimeout || 0
+const session = argv.session
+const identifier = argv.identifier
+const syncExecTimeout = argv.syncExecTimeout
+const asyncExecTimeout = argv.asyncExecTimeout
+const logCmd = argv.logCmd
 
 if (!fs.existsSync(baseDir)) {
   fs.mkdirSync(baseDir)
