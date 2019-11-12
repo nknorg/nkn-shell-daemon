@@ -99,3 +99,19 @@ public/
 
 .DS_Store
 *~
+
+# IDE / Editor
+.idea
+.editorconfig
+
+# Editor directories and files
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+/authorized_pubkeys
+/wallet.json
+/wallet.pswd
