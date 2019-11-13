@@ -18,9 +18,19 @@ have a public IP address. All connections are outbound instead of inbound. This
 makes nshd even more secure and convenient.
 
 4. Cross platform compatibility: It just takes a few lines of code to send
-commands and receive results in any language supporting NKN client SDK. It is
-worth mentioning that [d-chat](http://gitlab.com/losnappas/d-chat) is natively
-compatible to nshd without any modification.
+commands and receive results in any language supporting NKN client SDK.
+
+## Get Started
+
+The fastest way to get started is to run `nshd` with `--session` argument and
+use one of the following client:
+
+* [http://nsh.nkn.org](http://nsh.nkn.org) (source: [nkn-shell-client-xterm](https://github.com/nknorg/nkn-shell-client-xterm))
+
+* [d-chat](http://gitlab.com/losnappas/d-chat) private message
+
+But you still need to add your client public key to `authorized_pubkeys`, see
+the next section.
 
 ## Configurations
 
