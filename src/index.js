@@ -73,6 +73,11 @@ let argv = yargs
 
 const isWindows = os.platform() === 'win32'
 const pingInterval = 20000
+const ptyCols = 120
+const ptyRows = 30
+const sessionFlushIntervalInUse = 10
+const sessionFlushIntervalIdle = 25
+
 const showAddr = argv._[0] === 'addr'
 
 const baseDir = argv.baseDir + (argv.baseDir.endsWith('/') ? '' : '/')
@@ -186,8 +191,47 @@ const client = nknClient({
   identifier: identifier,
 })
 
-let ptyProcess
-let sessionSrc
+class Session {
+  constructor(client, remoteAddr) {
+    this.client = client
+    this.remoteAddr = remoteAddr
+    this.outputBuffer = ''
+    this.ptyProcess = spawn(shell, [], {
+      name: 'xterm-color',
+      cols: ptyCols,
+      rows: ptyRows,
+      cwd: isWindows ? process.env.USERPROFILE : process.env.HOME,
+      env: process.env,
+    })
+
+    this.ptyProcess.onData(data => {
+      this.outputBuffer += data
+    })
+
+    this.flushSession = () => {
+      if (this.outputBuffer.length > 0) {
+        let res = {
+          stdout: this.outputBuffer
+        }
+        this.outputBuffer = ''
+        this.client.send(this.remoteAddr, JSON.stringify(res), { msgHoldingSeconds: 0 }).catch(e => {
+          console.error("Send msg error:", e);
+        });
+        setTimeout(this.flushSession, sessionFlushIntervalInUse);
+      } else {
+        setTimeout(this.flushSession, sessionFlushIntervalIdle);
+      }
+    }
+
+    this.flushSession()
+  }
+
+  write(cmd) {
+    this.ptyProcess.write(cmd)
+  }
+}
+
+let sessions = {}
 
 client.on('connect', () => {
   console.log('Listening at', client.addr)
@@ -206,7 +250,7 @@ client.on('connect', () => {
   let lastUpdateTime = new Date()
   setInterval(async function () {
     try {
-      await client.send(client.addr, '', {msgHoldingSeconds: 0})
+      await client.send(client.addr, '', { msgHoldingSeconds: 0 })
       lastUpdateTime = new Date()
     } catch (e) {
       console.warn('Multiclient ping error:', e)
@@ -218,36 +262,6 @@ client.on('connect', () => {
       }
     }
   }, pingInterval)
-
-  if (session && !ptyProcess) {
-    let sessionBuffer = ''
-    let res
-    ptyProcess = spawn(shell, [], {
-      name: 'xterm-color',
-      cols: 120,
-      rows: 30,
-      cwd: isWindows ? process.env.USERPROFILE : process.env.HOME,
-      env: process.env,
-    })
-    ptyProcess.onData(data => {
-      sessionBuffer += data
-    })
-    function flushSession() {
-      if (sessionBuffer.length > 0) {
-        res = {
-          stdout: sessionBuffer
-        }
-        sessionBuffer = ''
-        client.send(sessionSrc, JSON.stringify(res), {msgHoldingSeconds: 0}).catch(e => {
-          console.error("Send msg error:", e);
-        });
-        setTimeout(flushSession, 10);
-      } else {
-        setTimeout(flushSession, 25);
-      }
-    }
-    flushSession()
-  }
 })
 
 client.on('message', async (src, payload, payloadType, encrypt) => {
@@ -300,12 +314,14 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
   } else {
     options.timeout = msg.execTimeout || asyncExecTimeout
     if (session && !msg.content) {
-      sessionSrc = src
-      ptyProcess.write(cmd)
+      if (!sessions[src]) {
+        sessions[src] = new Session(client, src)
+      }
+      sessions[src].write(cmd)
     } else {
       exec(cmd, options, (error, stdout, stderr) => {
         let res;
-        if (msg.content) {
+        if (msg.content) { // d-chat protocol
           res = {
             content: "```\n" + (stdout || stderr) + "\n```",
             contentType: "text",
