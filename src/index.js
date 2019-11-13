@@ -187,24 +187,10 @@ const client = nknClient({
 })
 
 let ptyProcess
-let res
-let sendRes
+let sessionSrc
+
 client.on('connect', () => {
   console.log('Listening at', client.addr)
-  if(session) {
-    ptyProcess = spawn(shell, [], {
-      name: 'xterm-color',
-      cols: 120,
-      rows: 30,
-      cwd: isWindows ? process.env.USERPROFILE : process.env.HOME,
-      env: process.env
-    })
-    ptyProcess.onData(data => {
-      if (typeof sendRes === 'function') {
-        sendRes(data)
-      }
-    })
-  }
 
   for (let i = 0, length = client.clients.length; i < length; i++) {
     let c = client.clients[i]
@@ -216,6 +202,7 @@ client.on('connect', () => {
       }
     }, pingInterval)
   }
+
   let lastUpdateTime = new Date()
   setInterval(async function () {
     try {
@@ -231,6 +218,36 @@ client.on('connect', () => {
       }
     }
   }, pingInterval)
+
+  if (session && !ptyProcess) {
+    let sessionBuffer = ''
+    let res
+    ptyProcess = spawn(shell, [], {
+      name: 'xterm-color',
+      cols: 120,
+      rows: 30,
+      cwd: isWindows ? process.env.USERPROFILE : process.env.HOME,
+      env: process.env,
+    })
+    ptyProcess.onData(data => {
+      sessionBuffer += data
+    })
+    function flushSession() {
+      if (sessionBuffer.length > 0) {
+        res = {
+          stdout: sessionBuffer
+        }
+        sessionBuffer = ''
+        client.send(sessionSrc, JSON.stringify(res), {msgHoldingSeconds: 0}).catch(e => {
+          console.error("Send msg error:", e);
+        });
+        setTimeout(flushSession, 10);
+      } else {
+        setTimeout(flushSession, 25);
+      }
+    }
+    flushSession()
+  }
 })
 
 client.on('message', async (src, payload, payloadType, encrypt) => {
@@ -282,27 +299,10 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
     })
   } else {
     options.timeout = msg.execTimeout || asyncExecTimeout
-    if(session) {
-      sendRes = function (data) {
-        if (msg.content) {
-          res = {
-            content: '```\n' + data + '\n```',
-            contentType: 'text',
-            timestamp: new Date().toUTCString(),
-            isPrivate: true,
-          }
-        } else {
-          res = {
-            stdout,
-            stderr,
-          }
-        }
-        client.send(src, JSON.stringify(res), {msgHoldingSeconds: 0}).catch(e => {
-          console.error('Send msg error:', e)
-        })
-      }
-      ptyProcess.write(cmd + '\r')
-    }else{
+    if (session && !msg.content) {
+      sessionSrc = src
+      ptyProcess.write(cmd)
+    } else {
       exec(cmd, options, (error, stdout, stderr) => {
         let res;
         if (msg.content) {
