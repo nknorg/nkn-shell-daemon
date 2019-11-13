@@ -22,8 +22,8 @@ commands and receive results in any language supporting NKN client SDK.
 
 ## Get Started
 
-The fastest way to get started is to run `nshd` with `--session` argument and
-use one of the following client:
+The fastest way to get started is to run `nshd` with one of the following
+client:
 
 * [http://nsh.nkn.org](http://nsh.nkn.org) (source: [nkn-shell-client-xterm](https://github.com/nknorg/nkn-shell-client-xterm))
 

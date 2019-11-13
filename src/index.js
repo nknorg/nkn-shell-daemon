@@ -40,7 +40,7 @@ let argv = yargs
     alias: 'sess',
     describe: 'nshd will save prev cmd',
     type: 'boolean',
-    default: false,
+    default: true,
   })
   .option('identifier', {
     alias: 'id',
