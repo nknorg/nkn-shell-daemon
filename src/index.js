@@ -196,6 +196,7 @@ class Session {
     this.client = client
     this.remoteAddr = remoteAddr
     this.outputBuffer = ''
+    this.exit = false
     this.ptyProcess = spawn(shell, [], Object.assign({
       name: 'xterm-color',
       cols: ptyCols,
@@ -206,6 +207,11 @@ class Session {
 
     this.ptyProcess.onData(data => {
       this.outputBuffer += data
+    })
+
+    this.ptyProcess.onExit(() => {
+      this.exit = true
+      delete sessions[this.remoteAddr]
     })
 
     this.flushSession = () => {
@@ -221,9 +227,13 @@ class Session {
         } catch (e) {
           console.error("Send msg error:", e)
         }
-        this.flushTimeout = setTimeout(this.flushSession, sessionFlushIntervalInUse)
+        if (!this.exit) {
+          this.flushTimeout = setTimeout(this.flushSession, sessionFlushIntervalInUse)
+        }
       } else {
-        this.flushTimeout = setTimeout(this.flushSession, sessionFlushIntervalIdle)
+        if (!this.exit) {
+          this.flushTimeout = setTimeout(this.flushSession, sessionFlushIntervalIdle)
+        }
       }
     }
 
