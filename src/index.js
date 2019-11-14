@@ -214,12 +214,16 @@ class Session {
           stdout: this.outputBuffer
         }
         this.outputBuffer = ''
-        this.client.send(this.remoteAddr, JSON.stringify(res), { msgHoldingSeconds: 0 }).catch(e => {
-          console.error("Send msg error:", e);
-        });
-        setTimeout(this.flushSession, sessionFlushIntervalInUse);
+        try {
+          this.client.send(this.remoteAddr, JSON.stringify(res), { msgHoldingSeconds: 0 }).catch(e => {
+            console.error("Send msg error:", e)
+          });
+        } catch (e) {
+          console.error("Send msg error:", e)
+        }
+        setTimeout(this.flushSession, sessionFlushIntervalInUse)
       } else {
-        setTimeout(this.flushSession, sessionFlushIntervalIdle);
+        setTimeout(this.flushSession, sessionFlushIntervalIdle)
       }
     }
 
@@ -228,6 +232,10 @@ class Session {
 
   write(cmd) {
     this.ptyProcess.write(cmd)
+  }
+
+  resize(size) {
+    this.ptyProcess.resize(size.cols, size.rows)
   }
 }
 
@@ -291,7 +299,19 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
     return false
   }
 
+  if (session && msg.resize) {
+    if (!sessions[src]) {
+      sessions[src] = new Session(client, src)
+    }
+    sessions[src].resize(msg.resize)
+    console.log('Resize to', msg.resize, 'from', src)
+  }
+
   let cmd = msg.cmd || msg.content
+  if (!cmd) {
+    return false
+  }
+
   let options = {
     uid: au.uid,
     gid: au.gid,
@@ -319,7 +339,7 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
       }
       sessions[src].write(cmd)
     } else {
-      exec(cmd, options, (error, stdout, stderr) => {
+      exec(cmd, options, async (error, stdout, stderr) => {
         let res;
         if (msg.content) { // d-chat protocol
           res = {
@@ -334,9 +354,11 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
             stderr,
           }
         }
-        client.send(src, JSON.stringify(res), { msgHoldingSeconds: 0 }).catch(e => {
-          console.error("Send msg error:", e);
-        });
+        try {
+          await client.send(src, JSON.stringify(res), { msgHoldingSeconds: 0 })
+        } catch (e) {
+          console.error("Send msg error:", e)
+        }
       });
     }
   }
