@@ -192,17 +192,17 @@ const client = nknClient({
 })
 
 class Session {
-  constructor(client, remoteAddr) {
+  constructor(client, remoteAddr, options) {
     this.client = client
     this.remoteAddr = remoteAddr
     this.outputBuffer = ''
-    this.ptyProcess = spawn(shell, [], {
+    this.ptyProcess = spawn(shell, [], Object.assign({
       name: 'xterm-color',
       cols: ptyCols,
       rows: ptyRows,
       cwd: isWindows ? process.env.USERPROFILE : process.env.HOME,
       env: process.env,
-    })
+    }, options))
 
     this.ptyProcess.onData(data => {
       this.outputBuffer += data
@@ -221,9 +221,9 @@ class Session {
         } catch (e) {
           console.error("Send msg error:", e)
         }
-        setTimeout(this.flushSession, sessionFlushIntervalInUse)
+        this.flushTimeout = setTimeout(this.flushSession, sessionFlushIntervalInUse)
       } else {
-        setTimeout(this.flushSession, sessionFlushIntervalIdle)
+        this.flushTimeout = setTimeout(this.flushSession, sessionFlushIntervalIdle)
       }
     }
 
@@ -299,9 +299,14 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
     return false
   }
 
+  let options = {
+    uid: au.uid,
+    gid: au.gid,
+  }
+
   if (session && msg.resize) {
     if (!sessions[src]) {
-      sessions[src] = new Session(client, src)
+      sessions[src] = new Session(client, src, options)
     }
     sessions[src].resize(msg.resize)
     console.log('Resize to', msg.resize, 'from', src)
@@ -310,11 +315,6 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
   let cmd = msg.cmd || msg.content
   if (!cmd) {
     return false
-  }
-
-  let options = {
-    uid: au.uid,
-    gid: au.gid,
   }
 
   console.log('Execute cmd' + (logCmd ? ' ' + cmd : ''), 'from', src)
@@ -335,7 +335,7 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
     options.timeout = msg.execTimeout || asyncExecTimeout
     if (session && !msg.content) {
       if (!sessions[src]) {
-        sessions[src] = new Session(client, src)
+        sessions[src] = new Session(client, src, options)
       }
       sessions[src].write(cmd)
     } else {
