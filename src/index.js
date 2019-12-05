@@ -101,7 +101,7 @@ try {
   let walletJson = fs.readFileSync(walletFile).toString()
   let password
   try {
-    password = fs.readFileSync(passwordFile).toString()
+    password = fs.readFileSync(passwordFile).toString().split('\n')[0]
   } catch (e) {
     console.error('Open password file error:', e.message)
     process.exit(1)
