@@ -138,38 +138,51 @@ try {
   fs.writeFileSync(authorizedPkFile, '')
   console.log('Create authorized pubkeys file', authorizedPkFile)
 }
-for (let i in authorizedPkRaw) {
-  let s = authorizedPkRaw[i].match(/\S+/g) || []
 
-  if (s.length == 0) {
-    continue
-  }
+authorizedPk = parseAuthorizedPk(authorizedPkRaw)
 
-  let au = {}
+fs.watchFile(authorizedPkFile, () => {
+  console.log('Reload authorized pubkeys file');
+  authorizedPkRaw = fs.readFileSync(authorizedPkFile).toString().split('\n')
+  authorizedPk = parseAuthorizedPk(authorizedPkRaw)
+})
 
-  if (s[0].includes('.')) {
-    au.addr = s[0]
-  } else {
-    au.pk = s[0]
-  }
+function parseAuthorizedPk(raw) {
+  let parsed = []
+  for (let i in raw) {
+    let s = raw[i].match(/\S+/g) || []
 
-  if (s.length > 1) {
-    au.uid = parseInt(s[1])
-    if (isNaN(au.uid)) {
-      console.error('Error parsing uid from', s[1])
+    if (s.length == 0) {
       continue
     }
-  }
 
-  if (s.length > 2) {
-    au.gid = parseInt(s[2])
-    if (isNaN(au.gid)) {
-      console.error('Error parsing gid from', s[2])
-      continue
+    let au = {}
+
+    if (s[0].includes('.')) {
+      au.addr = s[0]
+    } else {
+      au.pk = s[0]
     }
-  }
 
-  authorizedPk = authorizedPk.concat(au)
+    if (s.length > 1) {
+      au.uid = parseInt(s[1])
+      if (isNaN(au.uid)) {
+        console.error('Error parsing uid from', s[1])
+        continue
+      }
+    }
+
+    if (s.length > 2) {
+      au.gid = parseInt(s[2])
+      if (isNaN(au.gid)) {
+        console.error('Error parsing gid from', s[2])
+        continue
+      }
+    }
+
+    parsed = parsed.concat(au)
+  }
+  return parsed
 }
 
 function getAuthorizedUser(src) {
