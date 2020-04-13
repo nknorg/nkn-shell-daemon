@@ -1,6 +1,6 @@
 {
   "name": "nkn-shell-daemon",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "NKN Shell Daemon",
   "main": "nshd.js",
   "bin": {
@@ -28,8 +28,7 @@
   },
   "homepage": "https://nkn.org",
   "dependencies": {
-    "nkn-multiclient": "^0.0.8",
-    "nkn-wallet": "^0.4.7",
+    "nkn-sdk": "^1.1.1",
     "node-pty": "^0.9.0",
     "yargs": "^14.2.0"
   },

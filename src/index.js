@@ -2,10 +2,10 @@ import fs from 'fs'
 import os from 'os'
 import yargs from 'yargs'
 import { spawn } from 'node-pty'
-import nknClient from 'nkn-multiclient'
-import nknWallet from 'nkn-wallet'
+import nkn from 'nkn-sdk'
 import { randomBytes } from 'crypto'
 import { exec, execSync } from 'child_process'
+import WebSocket from 'isomorphic-ws'
 
 let argv = yargs
   .command('$0', 'start nshd')
@@ -107,7 +107,7 @@ try {
     process.exit(1)
   }
   try {
-    wallet = nknWallet.loadJsonWallet(walletJson, password)
+    wallet = nkn.Wallet.fromJSON(walletJson, { password })
   } catch (e) {
     console.error('Parse wallet error:', e)
     process.exit(1)
@@ -121,8 +121,8 @@ try {
     fs.writeFileSync(passwordFile, password)
     console.log('Create password and save to file', passwordFile)
   }
-  wallet = nknWallet.newWallet(password)
-  fs.writeFileSync(walletFile, wallet.toJSON())
+  wallet = new nkn.Wallet({ password })
+  fs.writeFileSync(walletFile, JSON.stringify(wallet))
   console.log('Create wallet and save to file', walletFile)
 }
 if (showAddr) {
@@ -199,7 +199,7 @@ function getAuthorizedUser(src) {
   return null
 }
 
-const client = nknClient({
+const client = new nkn.MultiClient({
   seed: wallet.getSeed(),
   identifier: identifier,
 })
@@ -227,16 +227,14 @@ class Session {
       delete sessions[this.remoteAddr]
     })
 
-    this.flushSession = () => {
+    this.flushSession = async () => {
       if (this.outputBuffer.length > 0) {
-        let res = {
-          stdout: this.outputBuffer
-        }
-        this.outputBuffer = ''
         try {
-          this.client.send(this.remoteAddr, JSON.stringify(res), { msgHoldingSeconds: 0 }).catch(e => {
-            console.error("Send msg error:", e)
-          });
+          let res = {
+            stdout: this.outputBuffer
+          };
+          await this.client.send(this.remoteAddr, JSON.stringify(res), { noReply: true })
+          this.outputBuffer = ''
         } catch (e) {
           console.error("Send msg error:", e)
         }
@@ -264,14 +262,13 @@ class Session {
 
 let sessions = {}
 
-client.on('connect', () => {
+client.onConnect(() => {
   console.log('Listening at', client.addr)
 
-  for (let i = 0, length = client.clients.length; i < length; i++) {
-    let c = client.clients[i]
+  for (let c of Object.values(client.clients)) {
     setInterval(function () {
       try {
-        c.ws && c.ws.ping && c.ws.ping()
+        c.ws && c.ws.readyState === WebSocket.OPEN && c.ws.ping && c.ws.ping()
       } catch (e) {
         console.warn('Websocket ping error:', e)
       }
@@ -281,22 +278,22 @@ client.on('connect', () => {
   let lastUpdateTime = new Date()
   setInterval(async function () {
     try {
-      await client.send(client.addr, '', { msgHoldingSeconds: 0 })
+      await client.send(client.addr, '')
       lastUpdateTime = new Date()
     } catch (e) {
       console.warn('Multiclient ping error:', e)
       if (new Date().getTime() - lastUpdateTime.getTime() > pingInterval * 3) {
         console.log('Multiclient keepalive timeout, trying to reconnect...')
-        for (let i = 0, length = client.clients.length; i < length; i++) {
-          client.clients[i].reconnect()
+        for (let c of Object.values(client.clients)) {
+          c.reconnect()
         }
       }
     }
   }, pingInterval)
 })
 
-client.on('message', async (src, payload, payloadType, encrypt) => {
-  if (!encrypt) {
+client.onMessage(async ({ src, payload, payloadType, isEncrypted }) => {
+  if (!isEncrypted) {
     console.log('Received unencrypted msg from', src)
     return false
   }
@@ -311,7 +308,7 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
     return false
   }
 
-  if (payloadType === nknClient.PayloadType.BINARY) {
+  if (payloadType !== nkn.pb.payloads.PayloadType.TEXT) {
     console.log('Received msg with wrong payload type from', src)
     return false
   }
@@ -378,7 +375,7 @@ client.on('message', async (src, payload, payloadType, encrypt) => {
           }
         }
         try {
-          await client.send(src, JSON.stringify(res), { msgHoldingSeconds: 0 })
+          await client.send(src, JSON.stringify(res), { noReply: true })
         } catch (e) {
           console.error("Send msg error:", e)
         }
