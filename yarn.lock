@@ -1875,10 +1875,10 @@ needle@^2.2.1:
     iconv-lite "^0.4.4"
     sax "^1.2.4"
 
-nkn-sdk@^1.1.1:
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/nkn-sdk/-/nkn-sdk-1.1.1.tgz#07012a85b46cacc856073b053db1561c56858b1e"
-  integrity sha512-GgsYtMFBiyLnSbVc4hH5pl9u91SzHRncbphhsAW/Yq+mah0oOlOnze/ImyeQSLw8yzrBBPoXKX84PfS2qkPynw==
+nkn-sdk@^1.1.6:
+  version "1.1.6"
+  resolved "https://registry.yarnpkg.com/nkn-sdk/-/nkn-sdk-1.1.6.tgz#2735c8217df080175bf3fdca3c8fda2594828b97"
+  integrity sha512-LYiUZCWFite5hRlVSShOiZUTcvIt6O+YXT0XddHhuJqESh6YFaXR9Gs7tsr70JXp8GX8Us+/CVTyomIs0p+z1Q==
   dependencies:
     "@nkn/ncp" "^1.0.6"
     axios "^0.19.2"
@@ -1894,6 +1894,7 @@ nkn-sdk@^1.1.1:
     libsodium-wrappers "^0.7.6"
     memory-cache "^0.2.0"
     pako "^1.0.11"
+    scrypt-js "^3.0.0"
     tweetnacl "^1.0.3"
     webworkify "^1.5.0"
     ws "^7.2.3"
@@ -2330,6 +2331,11 @@ sax@^1.2.4:
   version "1.2.4"
   resolved "https://registry.yarnpkg.com/sax/-/sax-1.2.4.tgz#2816234e2378bddc4e5354fab5caa895df7100d9"
   integrity sha512-NqVDv9TpANUjFm0N8uM5GxL36UgKi9/atZw+x7YFnQ8ckwFGKrl4xX4yWtrey3UJm5nP1kUbnYgLopqWNSRhWw==
+
+scrypt-js@^3.0.0:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/scrypt-js/-/scrypt-js-3.0.1.tgz#d314a57c2aef69d1ad98a138a21fe9eafa9ee312"
+  integrity sha512-cdwTTnqPu0Hyvf5in5asVdZocVDTNRmR7XEcJuIzMjJeSHybHl7vpB66AzwTaIg6CLSbtjcxc8fqcySfnTkccA==
 
 semver@^5.3.0, semver@^5.4.1, semver@^5.5.0, semver@^5.6.0, semver@^5.7.0:
   version "5.7.1"

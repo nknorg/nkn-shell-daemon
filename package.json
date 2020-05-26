@@ -28,7 +28,7 @@
   },
   "homepage": "https://nkn.org",
   "dependencies": {
-    "nkn-sdk": "^1.1.1",
+    "nkn-sdk": "^1.1.6",
     "node-pty": "^0.9.0",
     "yargs": "^14.2.0"
   },
