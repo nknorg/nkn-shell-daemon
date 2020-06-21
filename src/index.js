@@ -66,6 +66,11 @@ let argv = yargs
     type: 'boolean',
     default: false,
   })
+  .option('must-keepalive', {
+    describe: 'nshd will exit if keepalive failed',
+    type: 'boolean',
+    default: false,
+  })
   .help('help')
   .alias('h', 'help')
   .wrap(Math.min(120, yargs.terminalWidth()))
@@ -73,6 +78,7 @@ let argv = yargs
 
 const isWindows = os.platform() === 'win32'
 const pingInterval = 20000
+const forcePingInterval = 60000
 const ptyCols = 120
 const ptyRows = 30
 const sessionFlushIntervalInUse = 10
@@ -200,6 +206,7 @@ function getAuthorizedUser(src) {
 }
 
 const client = new nkn.MultiClient({
+  originalClient: true,
   seed: wallet.getSeed(),
   identifier: identifier,
 })
@@ -276,20 +283,57 @@ client.onConnect(() => {
   }
 
   let lastUpdateTime = new Date()
-  setInterval(async function () {
+  setInterval(async () => {
     try {
       await client.send(client.addr, '')
       lastUpdateTime = new Date()
     } catch (e) {
       console.warn('Multiclient ping error:', e)
-      if (new Date().getTime() - lastUpdateTime.getTime() > pingInterval * 3) {
+      let t = new Date().getTime() - lastUpdateTime.getTime()
+      if (argv.mustKeepalive && t > pingInterval * 5) {
+        process.exit(1)
+      }
+      if (t > pingInterval * 3) {
         console.log('Multiclient keepalive timeout, trying to reconnect...')
         for (let c of Object.values(client.clients)) {
-          c.reconnect()
+          c._reconnect()
         }
       }
     }
   }, pingInterval)
+
+  let lastForceUpdateTime = new Date()
+  setInterval(async () => {
+    let tempIdentifier = nkn.util.randomBytesHex(4)
+    if (identifier) {
+      tempIdentifier += '.' + identifier
+    }
+    let tempClient = new nkn.MultiClient({
+      originalClient: true,
+      seed: wallet.getSeed(),
+      identifier: tempIdentifier,
+    });
+    tempClient.onConnect(() => {
+      setTimeout(async () => {
+        try {
+          await tempClient.send(client.addr, '')
+          lastForceUpdateTime = new Date()
+        } catch (e) {
+          console.warn('Force ping error:', e)
+          let t = new Date().getTime() - lastForceUpdateTime.getTime()
+          if (argv.mustKeepalive && t > forcePingInterval * 5) {
+            process.exit(1)
+          }
+          if (t > forcePingInterval * 3) {
+            console.log('Force keepalive timeout, trying to reconnect...')
+            for (let c of Object.values(client.clients)) {
+              c._reconnect()
+            }
+          }
+        }
+      }, 3000);
+    })
+  }, forcePingInterval)
 })
 
 client.onMessage(async ({ src, payload, payloadType, isEncrypted }) => {
@@ -298,7 +342,7 @@ client.onMessage(async ({ src, payload, payloadType, isEncrypted }) => {
     return false
   }
 
-  if (src === client.addr) {
+  if (src.endsWith(client.getPublicKey()) && !payload) {
     return
   }
 
