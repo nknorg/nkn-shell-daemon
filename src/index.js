@@ -303,12 +303,18 @@ client.onConnect(() => {
   }, pingInterval)
 
   let lastForceUpdateTime = new Date()
+  let tempClient
   setInterval(async () => {
+    if (tempClient) {
+      tempClient.close().catch((e) => {
+        console.error('Close temp client error:', e);
+      })
+    }
     let tempIdentifier = nkn.util.randomBytesHex(4)
     if (identifier) {
       tempIdentifier += '.' + identifier
     }
-    let tempClient = new nkn.MultiClient({
+    tempClient = new nkn.MultiClient({
       originalClient: true,
       seed: wallet.getSeed(),
       identifier: tempIdentifier,
@@ -331,6 +337,10 @@ client.onConnect(() => {
             }
           }
         }
+        tempClient.close().catch((e) => {
+          console.error('Close temp client error:', e);
+        })
+        tempClient = null
       }, 3000);
     })
   }, forcePingInterval)

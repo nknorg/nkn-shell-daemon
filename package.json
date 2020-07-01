@@ -1,6 +1,6 @@
 {
   "name": "nkn-shell-daemon",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "NKN Shell Daemon",
   "main": "nshd.js",
   "bin": {
