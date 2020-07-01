@@ -77,6 +77,7 @@ let argv = yargs
   .argv
 
 const isWindows = os.platform() === 'win32'
+const clientConnectTimeout = 20000
 const pingInterval = 20000
 const forcePingInterval = 60000
 const ptyCols = 120
@@ -205,12 +206,6 @@ function getAuthorizedUser(src) {
   return null
 }
 
-const client = new nkn.MultiClient({
-  originalClient: true,
-  seed: wallet.getSeed(),
-  identifier: identifier,
-})
-
 class Session {
   constructor(client, remoteAddr, options) {
     this.client = client
@@ -267,11 +262,9 @@ class Session {
   }
 }
 
-let sessions = {}
+var sessions = {}
 
-client.onConnect(() => {
-  console.log('Listening at', client.addr)
-
+function keepalive(client) {
   for (let c of Object.values(client.clients)) {
     setInterval(function () {
       try {
@@ -344,96 +337,129 @@ client.onConnect(() => {
       }, 3000);
     })
   }, forcePingInterval)
-})
+}
 
-client.onMessage(async ({ src, payload, payloadType, isEncrypted }) => {
-  if (!isEncrypted) {
-    console.log('Received unencrypted msg from', src)
-    return false
-  }
-
-  if (src.endsWith(client.getPublicKey()) && !payload) {
-    return
-  }
-
-  let au = getAuthorizedUser(src)
-  if (!au) {
-    console.log('Received msg from unauthorized sender', src)
-    return false
-  }
-
-  if (payloadType !== nkn.pb.payloads.PayloadType.TEXT) {
-    console.log('Received msg with wrong payload type from', src)
-    return false
-  }
-
-  let msg = JSON.parse(payload)
-
-  if (msg.timestamp && (Date.now() - Date.parse(msg.timestamp)) > 60000) {
-    return false
-  }
-
-  let options = {
-    uid: au.uid,
-    gid: au.gid,
-  }
-
-  if (session && msg.resize) {
-    if (!sessions[src]) {
-      sessions[src] = new Session(client, src, options)
-    }
-    sessions[src].resize(msg.resize)
-    console.log('Resize to', msg.resize, 'from', src)
-  }
-
-  let cmd = msg.cmd || msg.content
-  if (!cmd) {
-    return false
-  }
-
-  console.log('Execute cmd' + (logCmd ? ' ' + cmd : ''), 'from', src)
-
-  if (msg.execSync) {
-    options.timeout = msg.execTimeout || syncExecTimeout
-    let stdout, stderr
+(async () => {
+  let client
+  while (true) {
     try {
-      stdout = execSync(cmd, options).toString()
+      client = new nkn.MultiClient({
+        originalClient: true,
+        seed: wallet.getSeed(),
+        identifier: identifier,
+      })
     } catch (e) {
-      stderr = e.stderr ? e.stderr.toString() : e.error
+      console.error('Create client error:', e);
+      continue
     }
-    return JSON.stringify({
-      stdout,
-      stderr,
-    })
-  } else {
-    options.timeout = msg.execTimeout || asyncExecTimeout
-    if (session && !msg.content) {
+
+    try {
+      await new Promise((resolve, reject) => {
+        client.onConnect(resolve)
+        setTimeout(reject, clientConnectTimeout);
+      })
+    } catch (e) {
+      console.error('Client connect timeout')
+      client.close().catch(console.error)
+      continue
+    }
+
+    break
+  }
+
+  console.log('Listening at', client.addr)
+
+  keepalive(client)
+
+  client.onMessage(async ({ src, payload, payloadType, isEncrypted }) => {
+    if (!isEncrypted) {
+      console.log('Received unencrypted msg from', src)
+      return false
+    }
+
+    if (src.endsWith(client.getPublicKey()) && !payload) {
+      return
+    }
+
+    let au = getAuthorizedUser(src)
+    if (!au) {
+      console.log('Received msg from unauthorized sender', src)
+      return false
+    }
+
+    if (payloadType !== nkn.pb.payloads.PayloadType.TEXT) {
+      console.log('Received msg with wrong payload type from', src)
+      return false
+    }
+
+    let msg = JSON.parse(payload)
+
+    if (msg.timestamp && (Date.now() - Date.parse(msg.timestamp)) > 60000) {
+      return false
+    }
+
+    let options = {
+      uid: au.uid,
+      gid: au.gid,
+    }
+
+    if (session && msg.resize) {
       if (!sessions[src]) {
         sessions[src] = new Session(client, src, options)
       }
-      sessions[src].write(cmd)
-    } else {
-      exec(cmd, options, async (error, stdout, stderr) => {
-        let res;
-        if (msg.content) { // d-chat protocol
-          res = {
-            content: "```\n" + (stdout || stderr) + "\n```",
-            contentType: "text",
-            timestamp: new Date().toUTCString(),
-            isPrivate: true,
-          }
-        } else {
-          res = {
-            stdout,
-            stderr,
-          }
-        }
-        try {
-          await client.send(src, JSON.stringify(res), { noReply: true })
-        } catch (e) {
-          console.error("Send msg error:", e)
-        }
-      });
+      sessions[src].resize(msg.resize)
+      console.log('Resize to', msg.resize, 'from', src)
     }
-  }
-})
+
+    let cmd = msg.cmd || msg.content
+    if (!cmd) {
+      return false
+    }
+
+    console.log('Execute cmd' + (logCmd ? ' ' + cmd : ''), 'from', src)
+
+    if (msg.execSync) {
+      options.timeout = msg.execTimeout || syncExecTimeout
+      let stdout, stderr
+      try {
+        stdout = execSync(cmd, options).toString()
+      } catch (e) {
+        stderr = e.stderr ? e.stderr.toString() : e.error
+      }
+      return JSON.stringify({
+        stdout,
+        stderr,
+      })
+    } else {
+      options.timeout = msg.execTimeout || asyncExecTimeout
+      if (session && !msg.content) {
+        if (!sessions[src]) {
+          sessions[src] = new Session(client, src, options)
+        }
+        sessions[src].write(cmd)
+      } else {
+        exec(cmd, options, async (error, stdout, stderr) => {
+          let res;
+          if (msg.content) { // d-chat protocol
+            res = {
+              content: "```\n" + (stdout || stderr) + "\n```",
+              contentType: "text",
+              timestamp: new Date().toUTCString(),
+              isPrivate: true,
+            }
+          } else {
+            res = {
+              stdout,
+              stderr,
+            }
+          }
+          try {
+            await client.send(src, JSON.stringify(res), { noReply: true })
+          } catch (e) {
+            console.error("Send msg error:", e)
+          }
+        });
+      }
+    }
+  })
+})()
